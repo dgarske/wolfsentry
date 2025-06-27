@@ -3341,7 +3341,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_user_values_iterate_end(
     (((((len)+3)/4)*3) - ((len) > 1 ? \
                           ((buf)[(len)-1] == '=') : \
                           0) \
-     - ((len) > 2 ? ((buf)[(len)-2] == '=') : 0)) \
+     - ((len) > 2 ? ((buf)[(len)-2] == '=') : 0))
     /*!< \brief Given valid base64 string `buf` of length `len`, evaluates to the exact decoded length. @hideinitializer */
 
 WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_base64_decode(

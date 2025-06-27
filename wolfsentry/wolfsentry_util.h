@@ -171,7 +171,7 @@
     !defined(WOLFSENTRY_ATOMIC_POSTINCREMENT) || !defined(WOLFSENTRY_ATOMIC_POSTDECREMENT) || \
     !defined(WOLFSENTRY_ATOMIC_STORE) || !defined(WOLFSENTRY_ATOMIC_LOAD) || \
     !defined(WOLFSENTRY_ATOMIC_CMPXCHG)
-#error Missing required atomic implementation(s)
+   #error Missing required atomic implementation(s)
 #endif
 
 #endif /* WOLFSENTRY_HAVE_GNU_ATOMICS */
