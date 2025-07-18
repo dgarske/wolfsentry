@@ -136,7 +136,7 @@ ifdef NETXDUO
         LWIP_CFLAGS += -DWOLFSENTRY_NETXDUO -I$(NETXDUO_TOP) -D_NETINET_IN_H -DWOLFSENTRY_NO_GETPROTOBY
 endif
 
-CC_V := $(shell $(CC) -v 2>&1 | sed "s/'/'\\\\''/g; s/\`/'\\\\''/g;")
+CC_V := $(shell $(CC) -v 2>&1 | sed "s/[\`']/'\\\\''/g")
 
 CC_IS_GCC := $(shell if [[ '$(CC_V)' =~ 'gcc version' ]]; then echo 1; else echo 0; fi)
 
@@ -152,9 +152,9 @@ ifndef CLANG
     CLANG := clang
 endif
 
-AS_VERSION := $(shell $(AS) --version 2>&1 | sed "s/'/'\\\\''/g; s/\`/'\\\\''/g;")
-LD_VERSION := $(shell $(LD) --version 2>&1 | sed "s/'/'\\\\''/g; s/\`/'\\\\''/g;")
-AR_VERSION := $(shell $(AR) --version 2>&1 | sed "s/'/'\\\\''/g; s/\`/'\\\\''/g;")
+AS_VERSION := $(shell $(AS) --version 2>&1 | sed "s/[\`']/'\\\\''/g")
+LD_VERSION := $(shell $(LD) --version 2>&1 | sed "s/[\`']/'\\\\''/g")
+AR_VERSION := $(shell $(AR) --version 2>&1 | sed "s/[\`']/'\\\\''/g")
 
 AR_IS_GNU_AR := $(shell if [[ '$(AR_VERSION)' =~ 'GNU' ]]; then echo 1; else echo 0; fi)
 

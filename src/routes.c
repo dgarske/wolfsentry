@@ -30,9 +30,7 @@
 #include <lwip/inet.h>
 #include <lwip/sockets.h>
 #elif defined(WOLFSENTRY_NETXDUO)
-#include "nxd_bsd.h"
-/* undef OK this conflicts with the _OK macros in wolfsentry_errcodes.h */
-#undef OK
+#include "wolfsentry/wolfsentry_netxduo.h"
 #else
 #include <netinet/in.h>
 #include <arpa/inet.h>

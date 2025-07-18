@@ -34,9 +34,7 @@
 #ifdef WOLFSENTRY_LWIP
 #include "lwip/sockets.h"
 #elif defined(WOLFSENTRY_NETXDUO)
-#include "nxd_bsd.h"
-/* undef OK this conflicts with the _OK macros in wolfsentry_errcodes.h */
-#undef OK
+#include "wolfsentry/wolfsentry_netxduo.h"
 #else
 #include <arpa/inet.h>
 #include <sys/socket.h>

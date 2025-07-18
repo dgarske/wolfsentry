@@ -116,6 +116,11 @@
         #include <stdio.h>
     #endif
     #include <tx_api.h>
+
+    #if !defined(SIZE_T_32) && !defined(SIZE_T_64)
+        /* size_t is "unsigned int" by default */
+        #define SIZE_T_32
+    #endif
 #endif
 
 
