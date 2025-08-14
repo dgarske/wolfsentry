@@ -563,14 +563,6 @@ int wolfsentry_inet_pton(int af, const char* src, void* dst)
     return result;
 }
 
-/* Global wolfSentry context for NetX Duo integration */
-static struct wolfsentry_context *wolfsentry_netx_ctx = NULL;
-
-/* Constants for protocol numbers */
-#define NETX_PROTOCOL_TCP    6
-#define NETX_PROTOCOL_UDP    17
-#define NETX_PROTOCOL_ICMP   1
-
 /* IP header structure for parsing */
 #pragma pack(push, 1)
 struct netx_ip_header {
@@ -621,7 +613,7 @@ struct netx_udp_header {
  *
  * @return 0 on success, -1 on error
  */
-static int parse_netx_packet(unsigned char *packet_data, unsigned long data_length,
+static int parse_ip_packet(unsigned char *packet_data, unsigned long data_length,
     unsigned char *local_addr, unsigned char *remote_addr,
     unsigned short *local_port, unsigned short *remote_port,
     unsigned char *protocol, int is_outbound)
@@ -684,14 +676,14 @@ static int parse_netx_packet(unsigned char *packet_data, unsigned long data_leng
     *remote_port = 0;
 
     /* Extract port numbers for TCP and UDP */
-    if (*protocol == NETX_PROTOCOL_TCP || *protocol == NETX_PROTOCOL_UDP) {
+    if (*protocol == IPPROTO_TCP || *protocol == IPPROTO_UDP) {
         unsigned int ip_header_len = (ip_header->version_ihl & 0x0F) * 4;
 
         if (data_length < ip_header_len + sizeof(struct netx_tcp_header)) {
             return -1;
         }
 
-        if (*protocol == NETX_PROTOCOL_TCP) {
+        if (*protocol == IPPROTO_TCP) {
             tcp_header = (struct netx_tcp_header *)(packet_data + ip_header_len);
             if (is_outbound) {
                 *local_port = ntohs(tcp_header->source_port);
@@ -700,7 +692,7 @@ static int parse_netx_packet(unsigned char *packet_data, unsigned long data_leng
                 *local_port = ntohs(tcp_header->dest_port);
                 *remote_port = ntohs(tcp_header->source_port);
             }
-        } else if (*protocol == NETX_PROTOCOL_UDP) {
+        } else if (*protocol == IPPROTO_UDP) {
             udp_header = (struct netx_udp_header *)(packet_data + ip_header_len);
             if (is_outbound) {
                 *local_port = ntohs(udp_header->source_port);
@@ -727,7 +719,8 @@ static int parse_netx_packet(unsigned char *packet_data, unsigned long data_leng
  */
 static int build_wolfsentry_sockaddr(struct wolfsentry_sockaddr *sockaddr,
                                     const unsigned char *addr_bytes,
-                                    unsigned short port, unsigned char protocol)
+                                    unsigned short port, unsigned char protocol,
+                                    unsigned int interface_id)
 {
     if (!sockaddr || !addr_bytes) {
         return -1;
@@ -737,7 +730,7 @@ static int build_wolfsentry_sockaddr(struct wolfsentry_sockaddr *sockaddr,
     sockaddr->sa_proto = protocol;
     sockaddr->sa_port = (wolfsentry_port_t)port;
     sockaddr->addr_len = 32; /* IPv4 address length in bits */
-    sockaddr->interface = 0; /* Default interface */
+    sockaddr->interface = interface_id; /* Default interface */
 
     /* Copy IPv4 address (4 bytes) */
     memcpy(sockaddr->addr, addr_bytes, 4);
@@ -748,7 +741,7 @@ static int build_wolfsentry_sockaddr(struct wolfsentry_sockaddr *sockaddr,
 /**
  * @brief NetX Duo raw packet filter callback using wolfSentry
  *
- * This function is called by NetX Duo for each raw IP packet to determine
+ * This function is called with the IP packet to determine
  * whether the packet should be accepted or rejected based on wolfSentry rules.
  *
  * @param packet_data Pointer to the packet data buffer
@@ -756,8 +749,8 @@ static int build_wolfsentry_sockaddr(struct wolfsentry_sockaddr *sockaddr,
  *
  * @return NX_SUCCESS to accept packet, NX_NOT_SUCCESSFUL to reject packet
  */
-int wolfsentry_netx_packet_filter(unsigned char *packet_data, unsigned long data_length);
-int wolfsentry_netx_packet_filter(unsigned char *packet_data, unsigned long data_length)
+int wolfsentry_netx_ip_packet_filter(struct wolfsentry_context* ctx, unsigned int interface_id,
+    unsigned char *packet_data, unsigned long data_length)
 {
     unsigned char local_addr[4], remote_addr[4];
     unsigned short local_port, remote_port;
@@ -769,20 +762,19 @@ int wolfsentry_netx_packet_filter(unsigned char *packet_data, unsigned long data
     wolfsentry_ent_id_t rule_id;
     wolfsentry_route_flags_t inexact_matches;
 
-    /* sockaddr structures with space for IPv4 addresses */
-    WOLFSENTRY_SOCKADDR(32) local_sockaddr_buf, remote_sockaddr_buf;
+    /* Define sockaddr structures for local and remote endpoints */
+	WOLFSENTRY_SOCKADDR(32) local_sockaddr_buf, remote_sockaddr_buf; /* 32 bits for IPv4 address */
+    struct wolfsentry_sockaddr *local_sockaddr, *remote_sockaddr;
 
-    struct wolfsentry_sockaddr *local_sockaddr = (struct wolfsentry_sockaddr *)&local_sockaddr_buf;
-    struct wolfsentry_sockaddr *remote_sockaddr = (struct wolfsentry_sockaddr *)&remote_sockaddr_buf;
+	/* Initialize sockaddr structures */
+	memset(&local_sockaddr_buf, 0, sizeof(local_sockaddr_buf));
+	memset(&remote_sockaddr_buf, 0, sizeof(remote_sockaddr_buf));
 
-    /* Check if wolfSentry is initialized */
-    if (!wolfsentry_netx_ctx) {
-        /* If wolfSentry is not initialized, accept all packets */
-        return NX_SUCCESS;
-    }
+    local_sockaddr  = (struct wolfsentry_sockaddr*)&local_sockaddr_buf;
+    remote_sockaddr = (struct wolfsentry_sockaddr*)&remote_sockaddr_buf;
 
     /* Parse the packet to extract connection information */
-    parse_result = parse_netx_packet(packet_data, data_length,
+    parse_result = parse_ip_packet(packet_data, data_length,
         local_addr, remote_addr, &local_port, &remote_port, &protocol, 0);
     if (parse_result != 0) {
         /* If we can't parse the packet, accept it by default */
@@ -790,8 +782,8 @@ int wolfsentry_netx_packet_filter(unsigned char *packet_data, unsigned long data
     }
 
     /* Build wolfSentry sockaddr structures */
-    if (build_wolfsentry_sockaddr(local_sockaddr, local_addr, local_port, protocol) != 0 ||
-        build_wolfsentry_sockaddr(remote_sockaddr, remote_addr, remote_port, protocol) != 0) {
+    if (build_wolfsentry_sockaddr(local_sockaddr,  local_addr,  local_port,  protocol, interface_id) != 0 ||
+        build_wolfsentry_sockaddr(remote_sockaddr, remote_addr, remote_port, protocol, interface_id) != 0) {
         /* If we can't build sockaddr structures, accept packet by default */
         return NX_NOT_SUCCESSFUL;
     }
@@ -804,7 +796,7 @@ int wolfsentry_netx_packet_filter(unsigned char *packet_data, unsigned long data
 
     /* Call wolfSentry to evaluate the packet */
     ret = wolfsentry_route_event_dispatch(
-        wolfsentry_netx_ctx,
+        ctx,
         NULL, /* thread */
         remote_sockaddr,
         local_sockaddr,
@@ -833,69 +825,4 @@ int wolfsentry_netx_packet_filter(unsigned char *packet_data, unsigned long data
 
     /* If no explicit action, use default policy (reject) */
     return NX_NOT_SUCCESSFUL;
-}
-
-/**
- * @brief Install WolfSentry packet filter callbacks for NetX Duo
- *
- * This function installs the WolfSentry packet filtering callbacks into
- * the NetX Duo TCP/IP stack to enable packet filtering and security
- * policy enforcement.
- *
- * @param ip_ptr Pointer to the NetX Duo IP instance
- *
- * @return 0 on success, negative error code on failure
- */
-int wolfsentry_install_netx_filter_callbacks(NX_IP *ip_ptr)
-{
-    UINT nx_status;
-
-    if (!ip_ptr) {
-        return -1;
-    }
-
-    /* Enable raw packet processing in NetX */
-    nx_status = nx_ip_raw_packet_enable(ip_ptr);
-    if (nx_status != NX_SUCCESS) {
-        return -2;
-    }
-
-    /* Install the packet filter callback */
-    nx_status = nx_ip_raw_packet_filter_set(ip_ptr, wolfsentry_netx_packet_filter);
-    if (nx_status != NX_SUCCESS) {
-        return -3;
-    }
-
-    return 0;
-}
-
-/**
- * @brief Set the wolfSentry context for NetX Duo integration
- *
- * This function sets the wolfSentry context that will be used by the
- * packet filter callbacks. This must be called after wolfSentry is
- * initialized and before installing the filter callbacks.
- *
- * @param ctx Pointer to the wolfSentry context
- *
- * @return 0 on success, -1 on error
- */
-int wolfsentry_set_netx_context(struct wolfsentry_context *ctx)
-{
-    if (!ctx) {
-        return -1;
-    }
-
-    wolfsentry_netx_ctx = ctx;
-    return 0;
-}
-
-/**
- * @brief Get the current wolfSentry context for NetX Duo integration
- *
- * @return Pointer to the wolfSentry context, or NULL if not set
- */
-struct wolfsentry_context *wolfsentry_get_netx_context(void)
-{
-    return wolfsentry_netx_ctx;
 }

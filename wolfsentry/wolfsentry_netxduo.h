@@ -41,6 +41,9 @@
 #ifndef IPPROTO_UDP
 #define IPPROTO_UDP 17 /* TCP Socket */
 #endif
+#ifndef IPPROTO_ICMP
+#define IPPROTO_ICMP  1
+#endif
 
 #ifndef in_addr
 struct nx_bsd_in_addr {
@@ -75,8 +78,7 @@ int wolfsentry_inet_pton(int af, const char* src, void* dst);
 #endif
 
 struct wolfsentry_context;
-int wolfsentry_install_netx_filter_callbacks(NX_IP *ip_ptr);
-int wolfsentry_set_netx_context(struct wolfsentry_context *ctx);
-struct wolfsentry_context *wolfsentry_get_netx_context(void);
+int wolfsentry_netx_ip_packet_filter(struct wolfsentry_context* ctx, unsigned int interface_id,
+    unsigned char *packet_data, unsigned long data_length);
 
 #endif /* _WOLFSENTRY_NETXDUO_H */
