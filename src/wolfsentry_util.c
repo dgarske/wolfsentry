@@ -1561,7 +1561,7 @@ static int freertos_sem_destroy( sem_t * sem )
     #define sem_trywait threadx_sem_trywait
     static int threadx_sem_trywait( sem_t * sem )
     {
-        if (tx_semaphore_get(sem, 0) != TX_SUCCESS) {
+        if (tx_semaphore_get(sem, TX_NO_WAIT) != TX_SUCCESS) {
             errno = EINVAL;
             WOLFSENTRY_RETURN_VALUE(-1);
         }

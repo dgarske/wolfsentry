@@ -621,24 +621,19 @@ struct netx_udp_header {
  *
  * @return 0 on success, -1 on error
  */
-static int parse_netx_packet(NX_PACKET *packet_ptr, unsigned char *local_addr, unsigned char *remote_addr,
-                             unsigned short *local_port, unsigned short *remote_port,
-                             unsigned char *protocol, int is_outbound)
+static int parse_netx_packet(unsigned char *packet_data, unsigned long data_length,
+    unsigned char *local_addr, unsigned char *remote_addr,
+    unsigned short *local_port, unsigned short *remote_port,
+    unsigned char *protocol, int is_outbound)
 {
     struct netx_ip_header *ip_header;
     struct netx_tcp_header *tcp_header;
     struct netx_udp_header *udp_header;
-    unsigned char *packet_data;
-    unsigned long data_length;
     unsigned long ip_addr;
 
-    if (!packet_ptr || !local_addr || !remote_addr || !local_port || !remote_port || !protocol) {
+    if (!packet_data || !local_addr || !remote_addr || !local_port || !remote_port || !protocol) {
         return -1;
     }
-
-    /* Get packet data and length */
-    packet_data = packet_ptr->nx_packet_prepend_ptr;
-    data_length = (unsigned long)(packet_ptr->nx_packet_append_ptr - packet_ptr->nx_packet_prepend_ptr);
 
     /* Check minimum size for IP header */
     if (data_length < sizeof(struct netx_ip_header)) {
@@ -756,13 +751,13 @@ static int build_wolfsentry_sockaddr(struct wolfsentry_sockaddr *sockaddr,
  * This function is called by NetX Duo for each raw IP packet to determine
  * whether the packet should be accepted or rejected based on wolfSentry rules.
  *
- * @param ip_ptr Pointer to NetX IP instance
- * @param packet_type Type of packet (not used in this implementation)
- * @param packet_ptr Pointer to the packet
+ * @param packet_data Pointer to the packet data buffer
+ * @param data_length Length of the packet data in bytes
  *
  * @return NX_SUCCESS to accept packet, NX_NOT_SUCCESSFUL to reject packet
  */
-static UINT wolfsentry_netx_packet_filter(NX_IP *ip_ptr, ULONG packet_type, NX_PACKET *packet_ptr)
+int wolfsentry_netx_packet_filter(unsigned char *packet_data, unsigned long data_length);
+int wolfsentry_netx_packet_filter(unsigned char *packet_data, unsigned long data_length)
 {
     unsigned char local_addr[4], remote_addr[4];
     unsigned short local_port, remote_port;
@@ -780,10 +775,6 @@ static UINT wolfsentry_netx_packet_filter(NX_IP *ip_ptr, ULONG packet_type, NX_P
     struct wolfsentry_sockaddr *local_sockaddr = (struct wolfsentry_sockaddr *)&local_sockaddr_buf;
     struct wolfsentry_sockaddr *remote_sockaddr = (struct wolfsentry_sockaddr *)&remote_sockaddr_buf;
 
-    /* Unused parameters */
-    (void)packet_type;
-    (void)ip_ptr;
-
     /* Check if wolfSentry is initialized */
     if (!wolfsentry_netx_ctx) {
         /* If wolfSentry is not initialized, accept all packets */
@@ -791,18 +782,18 @@ static UINT wolfsentry_netx_packet_filter(NX_IP *ip_ptr, ULONG packet_type, NX_P
     }
 
     /* Parse the packet to extract connection information */
-    parse_result = parse_netx_packet(packet_ptr, local_addr, remote_addr,
-                                    &local_port, &remote_port, &protocol, 0);
+    parse_result = parse_netx_packet(packet_data, data_length,
+        local_addr, remote_addr, &local_port, &remote_port, &protocol, 0);
     if (parse_result != 0) {
         /* If we can't parse the packet, accept it by default */
-        return NX_SUCCESS;
+        return NX_NOT_SUCCESSFUL;
     }
 
     /* Build wolfSentry sockaddr structures */
     if (build_wolfsentry_sockaddr(local_sockaddr, local_addr, local_port, protocol) != 0 ||
         build_wolfsentry_sockaddr(remote_sockaddr, remote_addr, remote_port, protocol) != 0) {
         /* If we can't build sockaddr structures, accept packet by default */
-        return NX_SUCCESS;
+        return NX_NOT_SUCCESSFUL;
     }
 
     /* Set route flags for inbound packet */
@@ -818,8 +809,8 @@ static UINT wolfsentry_netx_packet_filter(NX_IP *ip_ptr, ULONG packet_type, NX_P
         remote_sockaddr,
         local_sockaddr,
         route_flags,
-        "connect-in",  /* event label */
-        strlen("connect-in"),
+        "netx",  /* event label */
+        strlen("netx"),
         NULL, /* caller_arg */
         &rule_id,
         &inexact_matches,
@@ -828,19 +819,20 @@ static UINT wolfsentry_netx_packet_filter(NX_IP *ip_ptr, ULONG packet_type, NX_P
 
     /* Handle wolfSentry errors */
     if (ret < 0) {
-        /* On error, accept packet by default (fail-open policy) */
-        return NX_SUCCESS;
+        /* On error, reject packet by default */
+        return NX_NOT_SUCCESSFUL;
     }
 
     /* Check action results */
     if (action_results & WOLFSENTRY_ACTION_RES_ACCEPT) {
         return NX_SUCCESS;
-    } else if (action_results & WOLFSENTRY_ACTION_RES_REJECT) {
-        return NX_NOT_SUCCESSFUL;
-    } else {
-        /* If no explicit action, use default policy (accept) */
-        return NX_SUCCESS;
     }
+    else if (action_results & WOLFSENTRY_ACTION_RES_REJECT) {
+        return NX_NOT_SUCCESSFUL;
+    }
+
+    /* If no explicit action, use default policy (reject) */
+    return NX_NOT_SUCCESSFUL;
 }
 
 /**
