@@ -78,7 +78,7 @@ int wolfsentry_inet_pton(int af, const char* src, void* dst);
 #endif
 
 struct wolfsentry_context;
-int wolfsentry_netx_ip_packet_filter(struct wolfsentry_context* ctx, unsigned int interface_id,
+int wolfsentry_netx_ip_packet_filter(struct wolfsentry_context* ctx, unsigned char interface_id,
     unsigned char *packet_data, unsigned long data_length);
 
 #endif /* _WOLFSENTRY_NETXDUO_H */

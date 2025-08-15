@@ -720,7 +720,7 @@ static int parse_ip_packet(unsigned char *packet_data, unsigned long data_length
 static int build_wolfsentry_sockaddr(struct wolfsentry_sockaddr *sockaddr,
                                     const unsigned char *addr_bytes,
                                     unsigned short port, unsigned char protocol,
-                                    unsigned int interface_id)
+                                    unsigned char interface_id)
 {
     if (!sockaddr || !addr_bytes) {
         return -1;
@@ -730,7 +730,7 @@ static int build_wolfsentry_sockaddr(struct wolfsentry_sockaddr *sockaddr,
     sockaddr->sa_proto = protocol;
     sockaddr->sa_port = (wolfsentry_port_t)port;
     sockaddr->addr_len = 32; /* IPv4 address length in bits */
-    sockaddr->interface = interface_id; /* Default interface */
+    sockaddr->interface = interface_id; /* 0=Default interface */
 
     /* Copy IPv4 address (4 bytes) */
     memcpy(sockaddr->addr, addr_bytes, 4);
@@ -749,7 +749,7 @@ static int build_wolfsentry_sockaddr(struct wolfsentry_sockaddr *sockaddr,
  *
  * @return NX_SUCCESS to accept packet, NX_NOT_SUCCESSFUL to reject packet
  */
-int wolfsentry_netx_ip_packet_filter(struct wolfsentry_context* ctx, unsigned int interface_id,
+int wolfsentry_netx_ip_packet_filter(struct wolfsentry_context* ctx, unsigned char interface_id,
     unsigned char *packet_data, unsigned long data_length)
 {
     unsigned char local_addr[4], remote_addr[4];
@@ -796,8 +796,7 @@ int wolfsentry_netx_ip_packet_filter(struct wolfsentry_context* ctx, unsigned in
 
     /* Call wolfSentry to evaluate the packet */
     ret = wolfsentry_route_event_dispatch(
-        ctx,
-        NULL, /* thread */
+        WOLFSENTRY_CONTEXT_ARGS_OUT_EX(ctx),
         remote_sockaddr,
         local_sockaddr,
         route_flags,
