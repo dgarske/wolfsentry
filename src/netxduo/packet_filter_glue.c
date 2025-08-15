@@ -843,8 +843,7 @@ int wolfsentry_netx_ip_packet_filter(struct wolfsentry_context* ctx, unsigned ch
         remote_sockaddr,
         local_sockaddr,
         route_flags,
-        "netx",  /* event label */
-        strlen("netx"),
+        NULL, 0, /* label */
         NULL, /* caller_arg */
         &rule_id,
         &inexact_matches,
