@@ -563,42 +563,85 @@ int wolfsentry_inet_pton(int af, const char* src, void* dst)
     return result;
 }
 
-/* IP header structure for parsing */
-#pragma pack(push, 1)
-struct netx_ip_header {
-    unsigned char version_ihl;
-    unsigned char tos;
-    unsigned short total_length;
-    unsigned short identification;
-    unsigned short fragment_offset;
-    unsigned char ttl;
-    unsigned char protocol;
-    unsigned short checksum;
-    unsigned long source_ip;
-    unsigned long dest_ip;
+#ifndef PACKED_STRUCT
+#define PACKED_STRUCT __attribute__((__packed__))
+#endif
+
+struct PACKED_STRUCT netx_ip_header {
+    struct {
+        uint8_t  version : 4;
+        uint8_t  ihl     : 4;
+    };
+    struct {
+        uint8_t  dscp : 6;
+        uint8_t  ecn  : 2;
+    };
+    uint16_t     total_length;
+    uint16_t     identification;
+    struct {
+        uint16_t flags           :  3;
+        uint16_t fragment_offset : 13;
+    };
+    uint8_t      time_to_live;
+    uint8_t      protocol;
+    uint16_t     header_checksum;
+    uint32_t     source_ip;
+    uint32_t     dest_ip;
 };
 
-/* TCP header structure for parsing */
-struct netx_tcp_header {
-    unsigned short source_port;
-    unsigned short dest_port;
-    unsigned long seq_num;
-    unsigned long ack_num;
-    unsigned char data_offset_flags;
-    unsigned char flags;
-    unsigned short window;
-    unsigned short checksum;
-    unsigned short urgent_ptr;
+struct PACKED_STRUCT netx_udp_header {
+    uint16_t    source_port;
+    uint16_t    dest_port;
+    uint16_t    length;
+    uint16_t    checksum;
 };
 
-/* UDP header structure for parsing */
-struct netx_udp_header {
-    unsigned short source_port;
-    unsigned short dest_port;
-    unsigned short length;
-    unsigned short checksum;
+struct PACKED_STRUCT netx_tcp_header
+{
+    uint16_t     source_port;
+    uint16_t     dest_port;
+    uint32_t     sequence_number;
+    uint32_t     acknowledgement_number;
+    struct {
+        uint16_t data_offset : 4;
+        uint16_t reserved    : 3;
+        uint16_t ns          : 1;
+        uint16_t cwr         : 1;
+        uint16_t ece         : 1;
+        uint16_t urg         : 1;
+        uint16_t ack         : 1;
+        uint16_t psh         : 1;
+        uint16_t rst         : 1;
+        uint16_t syn         : 1;
+        uint16_t fin         : 1;
+    };
+    uint16_t     window_size;
+    uint16_t     checksum;
+    uint16_t     urgent_pointer;
 };
-#pragma pack(pop)
+
+struct PACKED_STRUCT netx_arp_header
+{
+    uint16_t arp_htype;
+    uint16_t arp_ptype;
+    uint8_t  arp_hlen;
+    uint8_t  arp_plen;
+    uint16_t arp_oper;
+    uint8_t  arp_sha[6];
+    uint32_t arp_spa;
+    uint8_t  arp_tha[6];
+    uint32_t arp_tpa;
+};
+
+struct PACKED_STRUCT netx_icmp_header
+{
+    uint8_t  icmp_type;
+    uint8_t  icmp_code;
+    uint16_t icmp_checksum;
+    uint32_t icmp_header_extra;
+};
+
+
 
 /**
  * @brief Parse IP packet and extract endpoint information
@@ -618,9 +661,9 @@ static int parse_ip_packet(unsigned char *packet_data, unsigned long data_length
     unsigned short *local_port, unsigned short *remote_port,
     unsigned char *protocol, int is_outbound)
 {
-    struct netx_ip_header *ip_header;
-    struct netx_tcp_header *tcp_header;
-    struct netx_udp_header *udp_header;
+    struct netx_ip_header *ip;
+    struct netx_tcp_header *tcp;
+    struct netx_udp_header *udp;
     unsigned long ip_addr;
 
     if (!packet_data || !local_addr || !remote_addr || !local_port || !remote_port || !protocol) {
@@ -632,39 +675,39 @@ static int parse_ip_packet(unsigned char *packet_data, unsigned long data_length
         return -1;
     }
 
-    ip_header = (struct netx_ip_header *)packet_data;
+    ip = (struct netx_ip_header*)packet_data;
 
     /* Check IP version (IPv4 only) */
-    if ((ip_header->version_ihl >> 4) != 4) {
+    if (ip->version != 4) {
         return -1;
     }
 
     /* Extract protocol */
-    *protocol = ip_header->protocol;
+    *protocol = ip->protocol;
 
     /* Extract IP addresses (NetX uses host byte order) */
     if (is_outbound) {
         /* For outbound packets: source is local, destination is remote */
-        ip_addr = ip_header->source_ip;
+        ip_addr = ip->source_ip;
         local_addr[0] = (ip_addr >> 24) & 0xFF;
         local_addr[1] = (ip_addr >> 16) & 0xFF;
         local_addr[2] = (ip_addr >> 8) & 0xFF;
         local_addr[3] = ip_addr & 0xFF;
 
-        ip_addr = ip_header->dest_ip;
+        ip_addr = ip->dest_ip;
         remote_addr[0] = (ip_addr >> 24) & 0xFF;
         remote_addr[1] = (ip_addr >> 16) & 0xFF;
         remote_addr[2] = (ip_addr >> 8) & 0xFF;
         remote_addr[3] = ip_addr & 0xFF;
     } else {
         /* For inbound packets: destination is local, source is remote */
-        ip_addr = ip_header->dest_ip;
+        ip_addr = ip->dest_ip;
         local_addr[0] = (ip_addr >> 24) & 0xFF;
         local_addr[1] = (ip_addr >> 16) & 0xFF;
         local_addr[2] = (ip_addr >> 8) & 0xFF;
         local_addr[3] = ip_addr & 0xFF;
 
-        ip_addr = ip_header->source_ip;
+        ip_addr = ip->source_ip;
         remote_addr[0] = (ip_addr >> 24) & 0xFF;
         remote_addr[1] = (ip_addr >> 16) & 0xFF;
         remote_addr[2] = (ip_addr >> 8) & 0xFF;
@@ -677,29 +720,29 @@ static int parse_ip_packet(unsigned char *packet_data, unsigned long data_length
 
     /* Extract port numbers for TCP and UDP */
     if (*protocol == IPPROTO_TCP || *protocol == IPPROTO_UDP) {
-        unsigned int ip_header_len = (ip_header->version_ihl & 0x0F) * 4;
+        unsigned int ip_header_len = ip->ihl;
 
         if (data_length < ip_header_len + sizeof(struct netx_tcp_header)) {
             return -1;
         }
 
         if (*protocol == IPPROTO_TCP) {
-            tcp_header = (struct netx_tcp_header *)(packet_data + ip_header_len);
+            tcp = (struct netx_tcp_header*)(packet_data + ip_header_len);
             if (is_outbound) {
-                *local_port = ntohs(tcp_header->source_port);
-                *remote_port = ntohs(tcp_header->dest_port);
+                *local_port = ntohs(tcp->source_port);
+                *remote_port = ntohs(tcp->dest_port);
             } else {
-                *local_port = ntohs(tcp_header->dest_port);
-                *remote_port = ntohs(tcp_header->source_port);
+                *local_port = ntohs(tcp->dest_port);
+                *remote_port = ntohs(tcp->source_port);
             }
         } else if (*protocol == IPPROTO_UDP) {
-            udp_header = (struct netx_udp_header *)(packet_data + ip_header_len);
+            udp = (struct netx_udp_header*)(packet_data + ip_header_len);
             if (is_outbound) {
-                *local_port = ntohs(udp_header->source_port);
-                *remote_port = ntohs(udp_header->dest_port);
+                *local_port = ntohs(udp->source_port);
+                *remote_port = ntohs(udp->dest_port);
             } else {
-                *local_port = ntohs(udp_header->dest_port);
-                *remote_port = ntohs(udp_header->source_port);
+                *local_port = ntohs(udp->dest_port);
+                *remote_port = ntohs(udp->source_port);
             }
         }
     }
@@ -763,12 +806,12 @@ int wolfsentry_netx_ip_packet_filter(struct wolfsentry_context* ctx, unsigned ch
     wolfsentry_route_flags_t inexact_matches;
 
     /* Define sockaddr structures for local and remote endpoints */
-	WOLFSENTRY_SOCKADDR(32) local_sockaddr_buf, remote_sockaddr_buf; /* 32 bits for IPv4 address */
+    WOLFSENTRY_SOCKADDR(32) local_sockaddr_buf, remote_sockaddr_buf; /* 32 bits for IPv4 address */
     struct wolfsentry_sockaddr *local_sockaddr, *remote_sockaddr;
 
-	/* Initialize sockaddr structures */
-	memset(&local_sockaddr_buf, 0, sizeof(local_sockaddr_buf));
-	memset(&remote_sockaddr_buf, 0, sizeof(remote_sockaddr_buf));
+    /* Initialize sockaddr structures */
+    memset(&local_sockaddr_buf, 0, sizeof(local_sockaddr_buf));
+    memset(&remote_sockaddr_buf, 0, sizeof(remote_sockaddr_buf));
 
     local_sockaddr  = (struct wolfsentry_sockaddr*)&local_sockaddr_buf;
     remote_sockaddr = (struct wolfsentry_sockaddr*)&remote_sockaddr_buf;
