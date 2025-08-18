@@ -33,13 +33,6 @@
 #include <wolfsentry/wolfsentry_netxduo.h>
 #include <string.h>
 
-/* Network byte order conversion functions */
-#ifndef ntohs
-#define ntohs(x) ((((x) & 0xff) << 8) | (((x) & 0xff00) >> 8))
-#endif
-#ifndef ntohl
-#define ntohl(x) ((((x) & 0xff) << 24) | (((x) & 0xff00) << 8) | (((x) & 0xff0000) >> 8) | (((x) & 0xff000000) >> 24))
-#endif
 
 /* Constants for address conversion */
 #define MAX_UINT32_DECIMAL_LEN  12    /* Max for 32-bit: 4294967295 (10 digits) + null + extra */
@@ -666,7 +659,8 @@ static int parse_ip_packet(unsigned char *packet_data, unsigned long data_length
     struct netx_udp_header *udp;
     unsigned long ip_addr;
 
-    if (!packet_data || !local_addr || !remote_addr || !local_port || !remote_port || !protocol) {
+    if (!packet_data || !local_addr || !remote_addr || !local_port ||
+        !remote_port || !protocol) {
         return -1;
     }
 
@@ -720,7 +714,7 @@ static int parse_ip_packet(unsigned char *packet_data, unsigned long data_length
 
     /* Extract port numbers for TCP and UDP */
     if (*protocol == IPPROTO_TCP || *protocol == IPPROTO_UDP) {
-        unsigned int ip_header_len = ip->ihl;
+        unsigned int ip_header_len = ip->ihl * 4; /* number of 32-bits */
 
         if (data_length < ip_header_len + sizeof(struct netx_tcp_header)) {
             return -1;
@@ -832,7 +826,9 @@ int wolfsentry_netx_ip_packet_filter(struct wolfsentry_context* ctx, unsigned ch
     }
 
     /* Set route flags for inbound packet */
-    route_flags = WOLFSENTRY_ROUTE_FLAG_DIRECTION_IN;
+    route_flags = WOLFSENTRY_ROUTE_FLAG_DIRECTION_IN |
+        WOLFSENTRY_ROUTE_FLAG_SA_REMOTE_ADDR_WILDCARD |
+        WOLFSENTRY_ROUTE_FLAG_SA_REMOTE_PORT_WILDCARD;
 
     /* Initialize action results */
     action_results = WOLFSENTRY_ACTION_RES_NONE;
