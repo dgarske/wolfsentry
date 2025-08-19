@@ -85,9 +85,9 @@ typedef enum {
 /*! @endcond */
 #endif
 
-#include <wolfsentry/wolfsentry_settings.h>
-#include <wolfsentry/wolfsentry_af.h>
-#include <wolfsentry/wolfsentry_errcodes.h>
+#include "wolfsentry/wolfsentry_settings.h"
+#include "wolfsentry/wolfsentry_af.h"
+#include "wolfsentry/wolfsentry_errcodes.h"
 
 struct wolfsentry_allocator;
 struct wolfsentry_context;
@@ -2489,6 +2489,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_set_wildcard(
     struct wolfsentry_route *route,
     wolfsentry_route_flags_t wildcards_to_set);
 
+#ifndef WOLFSENTRY_NO_STDIO_STREAMS
 WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_format_address(
     WOLFSENTRY_CONTEXT_ARGS_IN,
     wolfsentry_addr_family_t sa_family,
@@ -2497,6 +2498,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_format_address(
     char *buf,
     int *buflen);
     /*!< \brief Render a binary address in human-readable form to a buffer */
+#endif
 
 #if defined(WOLFSENTRY_PROTOCOL_NAMES) || defined(WOLFSENTRY_JSON_DUMP_UTILS) || !defined(WOLFSENTRY_NO_JSON)
 
@@ -3012,7 +3014,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_event_action_list_done(
 /*! @} (end wolfsentry_event) */
 
 #ifdef WOLFSENTRY_HAVE_JSON_DOM
-#include <wolfsentry/centijson_dom.h>
+#include "wolfsentry/centijson_dom.h"
 #endif
 
 /*! \addtogroup wolfsentry_kv
@@ -3341,7 +3343,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_user_values_iterate_end(
     (((((len)+3)/4)*3) - ((len) > 1 ? \
                           ((buf)[(len)-1] == '=') : \
                           0) \
-     - ((len) > 2 ? ((buf)[(len)-2] == '=') : 0)) \
+     - ((len) > 2 ? ((buf)[(len)-2] == '=') : 0))
     /*!< \brief Given valid base64 string `buf` of length `len`, evaluates to the exact decoded length. @hideinitializer */
 
 WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_base64_decode(
@@ -3358,10 +3360,18 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_base64_decode(
     #include "wolfsentry/wolfsentry_lwip.h"
 #endif
 
+#ifdef WOLFSENTRY_NETXDUO
+    #include "wolfsentry/wolfsentry_netxduo.h"
+#endif
+
 /* conditionally include wolfsentry_util.h last -- none of the above rely on it.
  */
 #ifndef WOLFSENTRY_NO_UTIL_H
-#include <wolfsentry/wolfsentry_util.h>
+#include "wolfsentry/wolfsentry_util.h"
+#endif
+
+#ifdef WOLFSENTRY_HAVE_JSON_DOM
+#include "wolfsentry/wolfsentry_json.h"
 #endif
 
 #endif /* WOLFSENTRY_H */

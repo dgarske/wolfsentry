@@ -22,8 +22,6 @@
 
 #define WOLFSENTRY_SOURCE_ID WOLFSENTRY_SOURCE_ID_ROUTES_C
 
-#include "wolfsentry_internal.h"
-
 #ifndef WOLFSENTRY_NO_ALLOCA
 #include <alloca.h>
 #endif
@@ -31,6 +29,8 @@
 #ifdef WOLFSENTRY_LWIP
 #include <lwip/inet.h>
 #include <lwip/sockets.h>
+#elif defined(WOLFSENTRY_NETXDUO)
+#include "wolfsentry/wolfsentry_netxduo.h"
 #else
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -39,6 +39,8 @@
 #ifndef WOLFSENTRY_NO_GETPROTOBY
 #include <netdb.h>
 #endif
+
+#include "wolfsentry_internal.h"
 
 static inline int cmp_addrs_prefixful(
     const byte *left_addr,
@@ -3704,6 +3706,8 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_table_iterate_end(
     WOLFSENTRY_RETURN_OK;
 }
 
+#ifndef WOLFSENTRY_NO_STDIO_STREAMS
+
 static inline char hexdigit_ntoa(unsigned int d) {
     d &= 0xf;
     if (d < 10)
@@ -3792,6 +3796,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_format_address(
     } else
         WOLFSENTRY_ERROR_RETURN(OP_NOT_SUPP_FOR_PROTO);
 }
+#endif
 
 #if defined(WOLFSENTRY_PROTOCOL_NAMES) || defined(WOLFSENTRY_JSON_DUMP_UTILS) || !defined(WOLFSENTRY_NO_JSON)
 
