@@ -814,21 +814,23 @@ int wolfsentry_netx_ip_packet_filter(struct wolfsentry_context* ctx, unsigned ch
     parse_result = parse_ip_packet(packet_data, data_length,
         local_addr, remote_addr, &local_port, &remote_port, &protocol, 0);
     if (parse_result != 0) {
-        /* If we can't parse the packet, accept it by default */
+        /* If we can't parse the packet, reject by default */
         return NX_NOT_SUCCESSFUL;
     }
 
     /* Build wolfSentry sockaddr structures */
-    if (build_wolfsentry_sockaddr(local_sockaddr,  local_addr,  local_port,  protocol, interface_id) != 0 ||
-        build_wolfsentry_sockaddr(remote_sockaddr, remote_addr, remote_port, protocol, interface_id) != 0) {
-        /* If we can't build sockaddr structures, accept packet by default */
+    if (build_wolfsentry_sockaddr(local_sockaddr,  local_addr,  local_port,
+            protocol, interface_id) != 0 ||
+        build_wolfsentry_sockaddr(remote_sockaddr, remote_addr, remote_port,
+            protocol, interface_id) != 0) {
+        /* If we can't build sockaddr structures, reject packet by default */
         return NX_NOT_SUCCESSFUL;
     }
 
     /* Set route flags for inbound packet */
     route_flags = WOLFSENTRY_ROUTE_FLAG_DIRECTION_IN |
         WOLFSENTRY_ROUTE_FLAG_SA_REMOTE_ADDR_WILDCARD |
-        WOLFSENTRY_ROUTE_FLAG_SA_REMOTE_PORT_WILDCARD;
+        WOLFSENTRY_ROUTE_FLAG_SA_LOCAL_PORT_WILDCARD;
 
     /* Initialize action results */
     action_results = WOLFSENTRY_ACTION_RES_NONE;
