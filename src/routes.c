@@ -4007,6 +4007,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_format_json(
         write_string("\"remote\":{");
 
         if (have_r_attr(SA_REMOTE_ADDR)) {
+#ifndef WOLFSENTRY_NO_STDIO_STREAMS
 #ifdef WOLFSENTRY_ADDR_BITMASK_MATCHING
             if (r->flags & WOLFSENTRY_ROUTE_FLAG_REMOTE_ADDR_BITMASK) {
                 int len_in_out = (int)*json_out_len;
@@ -4053,6 +4054,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_format_json(
                 WOLFSENTRY_RERETURN_IF_ERROR(ws_itoa(WOLFSENTRY_ROUTE_REMOTE_ADDR_BITS(r), json_out, json_out_len));
                 write_byte(',');
             }
+#endif /* !WOLFSENTRY_NO_STDIO_STREAMS */
         }
         if (have_r_attr(SA_REMOTE_PORT)) {
             write_string("\"port\":");
@@ -4075,6 +4077,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_format_json(
         write_string("\"local\":{");
 
         if (have_r_attr(SA_LOCAL_ADDR)) {
+#ifndef WOLFSENTRY_NO_STDIO_STREAMS
 #ifdef WOLFSENTRY_ADDR_BITMASK_MATCHING
             if (r->flags & WOLFSENTRY_ROUTE_FLAG_LOCAL_ADDR_BITMASK) {
                 int len_in_out = (int)*json_out_len;
@@ -4121,6 +4124,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_format_json(
                 WOLFSENTRY_RERETURN_IF_ERROR(ws_itoa(WOLFSENTRY_ROUTE_LOCAL_ADDR_BITS(r), json_out, json_out_len));
                 write_byte(',');
             }
+#endif /* !WOLFSENTRY_NO_STDIO_STREAMS */
         }
 
         if (have_r_attr(SA_LOCAL_PORT)) {
