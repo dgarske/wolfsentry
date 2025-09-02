@@ -4346,7 +4346,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_base64_decode(const char *src, si
     const char *src_end = src + src_len;
     size_t dest_len = 0;
 
-    if (WOLFSENTRY_BASE64_DECODED_BUFSPC(src, (int)src_len) > (int)*dest_spc)
+    if (WOLFSENTRY_BASE64_DECODED_BUFSPC(src, src_len) > *dest_spc)
         WOLFSENTRY_ERROR_RETURN(BUFFER_TOO_SMALL);
 
     for (; src < src_end; ++src) {

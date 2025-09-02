@@ -2489,7 +2489,6 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_set_wildcard(
     struct wolfsentry_route *route,
     wolfsentry_route_flags_t wildcards_to_set);
 
-#ifndef WOLFSENTRY_NO_STDIO_STREAMS
 WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_format_address(
     WOLFSENTRY_CONTEXT_ARGS_IN,
     wolfsentry_addr_family_t sa_family,
@@ -2498,7 +2497,6 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_format_address(
     char *buf,
     int *buflen);
     /*!< \brief Render a binary address in human-readable form to a buffer */
-#endif
 
 #if defined(WOLFSENTRY_PROTOCOL_NAMES) || defined(WOLFSENTRY_JSON_DUMP_UTILS) || !defined(WOLFSENTRY_NO_JSON)
 
